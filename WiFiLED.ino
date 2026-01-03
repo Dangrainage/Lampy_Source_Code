@@ -1,17 +1,20 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 
-const char *ssid = "yourssid";
-const char *password = "yourpsswd";
-const char* domainToCheck = "localserveraddress1";
-const char* domainToCheck1 = "localserveraddress2";
-const char* ntfyURL = "ntfyservercheckinurl";
-const char* ntfyURL1 = "ntfyserverdownalerturl";
+const char *ssid = "yourssidhere";
+const char *password = "yourpasshere";
+const char* domainToCheck = "ipaddr1";
+const char* domainToCheck1 = "ipaddr2";
+const char* ntfyURL = "yourntfyurl1";
+const char* ntfyURL1 = "yourntfyurl2";
+const char* ntfyURL2 = "yourntfyurl3";
+const char* ntfyToken = "yourntfytoken";
 bool server_down = false;
 
 unsigned long lastCheckTime = 0;
 unsigned long lastBlinkTime = 0;
 bool ledState = false;
+int temp = 0;
 
 NetworkServer server(80);
 
@@ -64,7 +67,7 @@ void loop() {
     client.stop();
   }
 
-  unsigned long now = millis();
+  unsigned long now = millis(); // runs every roughly hourish
   if (now - lastCheckTime >= 3600000UL || lastCheckTime == 0) {
     checkOnline();
     lastCheckTime = now;
@@ -81,10 +84,18 @@ void loop() {
   }
 }
 
-void postRequest(const char* url, const char* payload) {
+
+
+
+
+
+void postRequest(const char* url, const char* payload, const char* token = nullptr) {
   HTTPClient http;
   http.begin(url);
   http.addHeader("Content-Type", "application/json");
+  if (token != nullptr && token[0] != '\0') {
+    http.addHeader("Authorization", String("Bearer ") + String(token));
+  }
   http.POST(payload);
   http.end();
 }
@@ -94,20 +105,29 @@ void checkOnline() {
   WiFiClient client1;
 
   if (client1.connect(domainToCheck, 80)) {
-    postRequest(ntfyURL, "Prim_Server is up!");
+    postRequest(ntfyURL, "Prim_Server is up!", ntfyToken);
     client1.stop();
   } else {
     down = true;
-    postRequest(ntfyURL1, "Prim_Server is down! Fix It!");
+    postRequest(ntfyURL1, "Prim_Server is down! Fix It!", ntfyToken);
   }
 
   if (client1.connect(domainToCheck1, 80)) { 
-    postRequest(ntfyURL, "Sec_Server is up!");
+    postRequest(ntfyURL, "Sec_Server is up!", ntfyToken);
     client1.stop(); 
   } else {
     down = true;
-    postRequest(ntfyURL1, "Sec_Server is down! Fix It!");
+    postRequest(ntfyURL1, "Sec_Server is down! Fix It!", ntfyToken);
   }
 
   server_down = down;
+
+  // send temperature logic from here on down
+
+  temp = temperatureRead(); 
+  String tempStr = "Current ESP32 temperature is: " + String(temp) + "°C";
+  postRequest(ntfyURL2, tempStr.c_str(), ntfyToken);
+
+
+
 }
